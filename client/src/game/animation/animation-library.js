@@ -52,7 +52,7 @@ export class AnimationLibrary {
   }
 
   async loadAnimation(name, parts = ["full"]) {
-    const fbx = await this.loader.loadAsync(`/src/game/animation/files/${name}.fbx`);
+    const fbx = await this.loader.loadAsync(`/public/animations/${name}.fbx`);
     const clip = fbx.animations[0];
 
     if (!clip) {
