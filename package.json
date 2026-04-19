@@ -1,0 +1,11 @@
+{
+  "name": "server-client-setup",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postinstall": "npm --prefix client install && npm --prefix server install",
+    "dev": "npm --prefix server run dev",
+    "build": "npm --prefix client run build",
+    "start": "node server/index.js"
+  }
+}
