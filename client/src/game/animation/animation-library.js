@@ -52,7 +52,7 @@ export class AnimationLibrary {
   }
 
   async loadAnimation(name, parts = ["full"]) {
-    const fbx = await this.loader.loadAsync(`/public/animations/${name}.fbx`);
+    const fbx = await this.loader.loadAsync(`/animations/${name}.fbx`);
     const clip = fbx.animations[0];
 
     if (!clip) {

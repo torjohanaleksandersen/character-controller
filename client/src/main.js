@@ -100,9 +100,6 @@ addMap();
 
 
 
-
-
-
 let accumulator = 0;
 const fixedTimeStep = 1 / 165;
 

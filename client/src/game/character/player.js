@@ -45,7 +45,7 @@ export class Player extends Character {
             });
         });
 
-        const mesh = await fbxLoader.loadAsync("/public/models/swat.fbx");
+        const mesh = await fbxLoader.loadAsync("/models/swat.fbx");
         mesh.scale.setScalar(0.01);
         mesh.position.set(0, -this.height / 2 - this.radius, 0);
         this.animator = new Animator(mesh);
