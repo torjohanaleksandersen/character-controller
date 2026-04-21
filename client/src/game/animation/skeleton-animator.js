@@ -51,6 +51,10 @@ export class SkeletonAnimator {
         action.enabled = true;
         action.clampWhenFinished = false;
         action.setLoop(THREE.LoopRepeat);
+
+        action.timeScale = animationLibrary.timeScales[name];
+
+
         this.layers[layerName].actions[name] = action;
       });
     });

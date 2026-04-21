@@ -15,12 +15,23 @@ const cameraRight = new THREE.Vector3(1, 0, 0);
 
 const fbxLoader = new FBXLoader();
 
+const bones = new Map();
+
 export class Player extends Character {
 
     constructor () {
         super();
 
         this.keys = {};
+
+        this.mouse = {
+            left: false,
+            right: false
+        };
+
+        //state
+        this.aiming = false;
+        this.inHand = "empty"
 
         this.transform.setPosition(0, 10, 0);
     }
@@ -33,7 +44,7 @@ export class Player extends Character {
         cameraControls.maxPolarAngle = THREE.MathUtils.degToRad(170);  // look down limit
         inputHandler.onLeftClick(() => {cameraControls.lock()});
 
-        const keys = ["w", "a", "s", "d", "space", "alt"];
+        const keys = ["w", "a", "s", "d", "space", "alt", "1", "2"];
 
         keys.forEach((key) => {
             inputHandler.onKeyDown(key, () => {
@@ -45,16 +56,58 @@ export class Player extends Character {
             });
         });
 
+        inputHandler.onRightClick(() => {
+            this.mouse.right = true;
+        })
+        inputHandler.onRightUp(() => {
+            this.mouse.right = false;
+        })
+
         const mesh = await fbxLoader.loadAsync("/models/swat.fbx");
         mesh.scale.setScalar(0.01);
         mesh.position.set(0, -this.height / 2 - this.radius, 0);
         this.animator = new Animator(mesh);
 
+        bones.set("spine", mesh.getObjectByName("mixamorigSpine"));
+        bones.set("spine1", mesh.getObjectByName("mixamorigSpine1"));
+        bones.set("spine2", mesh.getObjectByName("mixamorigSpine2"));
+
         this.mesh.add(mesh);
+
+        camera.lookAt(0, -2, 0.1);
+    }
+
+    computePlayerState() {
+        if (this.mouse.right) this.aiming = true;
+        else this.aiming = false;
+
+        if (this.keys["1"]) this.inHand = "empty";
+        if (this.keys["2"]) this.inHand = "rifle";
     }
 
 
 
+
+
+    correctBoneTransforms(moveX = 0, moveY = 0) {
+        if (this.inHand === "empty" || !this.aiming) return;
+
+        const baseRotation = THREE.MathUtils.degToRad(-30);
+
+        const walkRotation =
+            moveX > 0.001 ? Math.PI / 2 :
+            moveX < -0.001 ?  -Math.PI / 2 :
+            0;
+
+        const totalRotation = baseRotation + walkRotation;
+
+
+
+
+        bones.get("spine").rotateY(totalRotation * 0.33);
+        bones.get("spine1").rotateY(totalRotation * 0.33);
+        bones.get("spine2").rotateY(totalRotation * 0.33);
+    }
 
 
     /* UPDATE METHODS */
@@ -66,9 +119,13 @@ export class Player extends Character {
         this.updateMotor(dt, x, y, jump, cameraBasis.forward, cameraBasis.right, cameraBasis.yaw);
         this.updateTransform();
 
-        this.updateAnimator(dt, {x, y});
+        this.computePlayerState();
 
-        camera.position.copy(this.transform.position.clone().add(new THREE.Vector3(0, 2, 0)));
+        this.updateAnimator(dt, {x, y, inHand: this.inHand, aiming: this.aiming});
+
+        this.correctBoneTransforms(x, y);
+
+        camera.position.copy(this.transform.position.clone().add(new THREE.Vector3(0, 2, -1)));
     }
 
 
