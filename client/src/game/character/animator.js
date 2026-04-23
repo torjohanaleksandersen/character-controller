@@ -7,12 +7,13 @@ export class Animator {
         this.skeletonAnimator = new SkeletonAnimator(mesh);
     }
 
-    computeLowerWeights(moveX = 0, moveY = 0) {
+    computeLowerWeights(moveX = 0, moveY = 0, aiming = false) {
         const animX = moveY < 0 ? -moveX : moveX;
 
         const weights = {
             "walk-forward": Math.max(0, moveY),
             "walk-backward": Math.max(0, -moveY),
+            "walk-right_reversed": 0,
             "walk-right": Math.max(0, animX),
             "walk-left": Math.max(0, -animX),
             "idle": 0,
@@ -29,6 +30,11 @@ export class Animator {
             weights[key] /= total;
         }
 
+        if (aiming && moveY == 0) {
+            weights["walk-right_reversed"] = weights["walk-left"];
+            weights["walk-left"] = 0;
+        }
+
         return weights;
     }
 
@@ -41,23 +47,26 @@ export class Animator {
             //"walk-backward-rifle": Math.max(0, -moveY),
             //"walk-right-rifle": Math.max(0, animX),
             //"walk-left-rifle": Math.max(0, -animX),
-            //"idle-rifle": 0,
+            "idle-rifle": 0,
             "walk-rifle-aiming": 0,
             "idle-rifle-aiming": 0,
         };
 
-        if (!moving) {
-            if (aiming) weights["idle-rifle-aiming"] = 1;
-        } else {
-            if (aiming) weights["walk-rifle-aiming"] = 1;
-        }
+        if (aiming) {
+            weights["idle-rifle-aiming"] = 1;
+
+            return weights;
+        };
+
+        weights["idle-rifle"] = 1;
+        
 
         return weights;
         
     }
 
     animateModel(moveX = 0, moveY = 0, inHand = "empty", aiming = false) {
-        const lowerWeights = this.computeLowerWeights(moveX, moveY);
+        const lowerWeights = this.computeLowerWeights(moveX, moveY, aiming);
         this.skeletonAnimator.playWeighted("lower", lowerWeights);
 
         if (inHand === "rifle") {

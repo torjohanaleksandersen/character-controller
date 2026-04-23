@@ -27,7 +27,7 @@ const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.01, 1
 const renderer = new THREE.WebGLRenderer();
 
 renderer.setSize(innerWidth, innerHeight);
-renderer.setClearColor(new THREE.Color(0x000000));
+renderer.setClearColor(new THREE.Color(0x87CEEB));
 document.body.appendChild(renderer.domElement);
 
 const gravity = {x: 0, y: -9.81, z: 0};
@@ -52,7 +52,7 @@ scene.add(player.mesh);
 
 function addMap() {
   const groundGeo = new THREE.BoxGeometry(100, 1, 100);
-  const groundMat = new THREE.MeshStandardMaterial({ color: 0x999999 });
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x3d251e });
   const groundMesh = new THREE.Mesh(groundGeo, groundMat);
   scene.add(groundMesh);
   const groundBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
@@ -67,7 +67,7 @@ function addMap() {
   const direction = new THREE.Vector3();
   camera.getWorldDirection(direction); // forward direction
 
-  let count = 10;
+  let count = 50;
   for (let i = 0; i < count; i++) {
     const material = new THREE.MeshStandardMaterial({
       color: new THREE.Color(Math.random(), Math.random(), Math.random())
@@ -84,7 +84,7 @@ function addMap() {
 
     // Add small random spread
     basePos.x += (Math.random() - 0.5) * 2;
-    basePos.y += (Math.random() - 0.5) * 2 + 1;
+    basePos.y += (Math.random() - 0.5) + 4;
     basePos.z += (Math.random() - 0.5) * 2;
 
     cube.position.copy(basePos);

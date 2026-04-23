@@ -6,6 +6,7 @@ import { FBXLoader } from "three/addons/loaders/FBXLoader.js"
 import { camera, inputHandler } from "../../main";
 import { Character } from "./character";
 import { Animator } from "./animator";
+import { Transform } from "../state/transform";
 
 
 
@@ -34,6 +35,9 @@ export class Player extends Character {
         this.inHand = "empty"
 
         this.transform.setPosition(0, 10, 0);
+
+        this.currentLocalCameraTransform = new Transform();
+        this.nextLocalCameraTransform = new Transform();
     }
 
     async init() {
@@ -64,6 +68,11 @@ export class Player extends Character {
         })
 
         const mesh = await fbxLoader.loadAsync("/models/swat.fbx");
+        mesh.traverse(obj => {
+            if (obj.isMesh) {
+                obj.frustumCulled = false;
+            }
+        });
         mesh.scale.setScalar(0.01);
         mesh.position.set(0, -this.height / 2 - this.radius, 0);
         this.animator = new Animator(mesh);
@@ -71,6 +80,13 @@ export class Player extends Character {
         bones.set("spine", mesh.getObjectByName("mixamorigSpine"));
         bones.set("spine1", mesh.getObjectByName("mixamorigSpine1"));
         bones.set("spine2", mesh.getObjectByName("mixamorigSpine2"));
+        bones.set("hips", mesh.getObjectByName("mixamorigHips"));
+        bones.set("rightHand", mesh.getObjectByName("mixamorigRightHand"));
+        bones.set("leftHand", mesh.getObjectByName("mixamorigLeftHand"));
+        bones.set("rightEye", mesh.getObjectByName("mixamorigRightEye"));
+        bones.set("leftEye", mesh.getObjectByName("mixamorigLeftEye"));
+        bones.set("head", mesh.getObjectByName("mixamorigHead"));
+        bones.set("neck", mesh.getObjectByName("mixamorigNeck"));
 
         this.mesh.add(mesh);
 
@@ -78,35 +94,163 @@ export class Player extends Character {
     }
 
     computePlayerState() {
-        if (this.mouse.right) this.aiming = true;
-        else this.aiming = false;
-
         if (this.keys["1"]) this.inHand = "empty";
         if (this.keys["2"]) this.inHand = "rifle";
+
+        if (this.mouse.right && this.inHand == "rifle") this.aiming = true;
+        else this.aiming = false;
     }
 
-
-
-
-
     correctBoneTransforms(moveX = 0, moveY = 0) {
-        if (this.inHand === "empty" || !this.aiming) return;
+        const camDir = new THREE.Vector3();
+        camera.getWorldDirection(camDir);
+        camDir.y = 0;
+        camDir.normalize();
 
-        const baseRotation = THREE.MathUtils.degToRad(-30);
+        const camYaw = Math.atan2(camDir.x, camDir.z);
+        this.mesh.rotation.y = camYaw;
 
-        const walkRotation =
-            moveX > 0.001 ? Math.PI / 2 :
-            moveX < -0.001 ?  -Math.PI / 2 :
-            0;
+        camDir.set(0, 0, 0);
+        camera.getWorldDirection(camDir);
 
-        const totalRotation = baseRotation + walkRotation;
+        camDir.normalize();
+        const camPitch = Math.asin(camDir.y);
+
+        const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
+
+        if (!this.aiming) {
+            const neck = bones.get("neck");
+            neck.rotateX(-camPitch);
+        }
+
+        if (this.inHand !== "rifle") return;
+
+        const spine = bones.get("spine");
+        const spine1 = bones.get("spine1");
+        const spine2 = bones.get("spine2");
+        const rightHand = bones.get("rightHand");
+        const leftHand = bones.get("leftHand");
+
+        if (!spine || !spine1 || !spine2 || !rightHand || !leftHand || !spine.parent) return;
+
+        // 1. Neutralize inherited pitch/roll, keep yaw
+        const spineWorldQuat = new THREE.Quaternion();
+        spine.getWorldQuaternion(spineWorldQuat);
+
+        const spineWorldEuler = new THREE.Euler().setFromQuaternion(spineWorldQuat, "YXZ");
+        const yaw = spineWorldEuler.y;
+
+        const desiredWorldQuat = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(0, yaw, 0, "YXZ")
+        );
+
+        const parentWorldQuat = new THREE.Quaternion();
+        spine.parent.getWorldQuaternion(parentWorldQuat);
+
+        const desiredLocalQuat = parentWorldQuat.clone().invert().multiply(desiredWorldQuat);
+        spine.quaternion.copy(desiredLocalQuat);
+
+        // 3. Approximate upper-body forward from hands
+        const rightPos = new THREE.Vector3();
+        const leftPos = new THREE.Vector3();
+        rightHand.getWorldPosition(rightPos);
+        leftHand.getWorldPosition(leftPos);
+
+        const handSide = leftPos.sub(rightPos);
+        handSide.y = 0;
+
+        if (handSide.lengthSq() < 0.000001) return;
+
+        handSide.normalize();
 
 
+        const handForward = new THREE.Vector3(-handSide.z, 0, handSide.x).normalize();
+        const handYaw = Math.atan2(handForward.x, handForward.z);
 
+        const aimOffset = this.aiming ? THREE.MathUtils.degToRad(35) : 0;
+        const correctedHandYaw = handYaw + aimOffset;
 
-        bones.get("spine").rotateY(totalRotation * 0.33);
-        bones.get("spine1").rotateY(totalRotation * 0.33);
-        bones.get("spine2").rotateY(totalRotation * 0.33);
+        let deltaYaw = camYaw - correctedHandYaw;
+        deltaYaw = Math.atan2(Math.sin(deltaYaw), Math.cos(deltaYaw));
+
+        const baseRotation = this.aiming ? THREE.MathUtils.degToRad(-35) : 0;
+        const totalRotation = baseRotation + deltaYaw;
+
+        const yAxis = new THREE.Vector3(0, 1, 0);
+
+        const yawWeights = [0.5, 0.3, 0.2];
+        const pitchWeights = [0.15, 0.35, 0.5];
+
+        if (!this.aiming) {
+            let rest = 0;
+            for (let i = 0; i < 3; i ++) {
+                yawWeights[i] *= 0.5;
+                rest += yawWeights[i];
+            }
+
+            const neck = bones.get("neck");
+            neck.rotateY(rest * totalRotation);
+        };
+
+        const qYaw0 = new THREE.Quaternion().setFromAxisAngle(yAxis, totalRotation * yawWeights[0]);
+        const qYaw1 = new THREE.Quaternion().setFromAxisAngle(yAxis, totalRotation * yawWeights[1]);
+        const qYaw2 = new THREE.Quaternion().setFromAxisAngle(yAxis, totalRotation * yawWeights[2]);
+
+        
+        spine.quaternion.multiply(qYaw0);
+        spine1.quaternion.multiply(qYaw1);
+        spine2.quaternion.multiply(qYaw2);
+
+        if (!this.aiming) return;
+
+        function applyWorldAxisRotation(bone, worldAxis, angle) {
+            const parentWorldQuat = new THREE.Quaternion();
+            bone.parent.getWorldQuaternion(parentWorldQuat);
+
+            const localAxis = worldAxis.clone().applyQuaternion(parentWorldQuat.clone().invert()).normalize();
+
+            const q = new THREE.Quaternion().setFromAxisAngle(localAxis, angle);
+            bone.quaternion.multiply(q);
+        }
+
+        applyWorldAxisRotation(spine, camRight, camPitch * pitchWeights[0]);
+        applyWorldAxisRotation(spine1, camRight, camPitch * pitchWeights[1]);
+        applyWorldAxisRotation(spine2, camRight, camPitch * pitchWeights[2]);
+    }
+
+    setCameraTransform() {
+        camera.position.copy(this.transform.position).add(new THREE.Vector3(0, 1, -2));
+
+        return;
+        
+        
+
+        const rightEye = bones.get("rightEye");
+        const leftEye = bones.get("leftEye");
+
+        const pos = new THREE.Vector3();
+        const rightPos = new THREE.Vector3();
+        const leftPos = new THREE.Vector3();
+        const quat = new THREE.Quaternion();
+
+        rightEye.getWorldPosition(rightPos);
+        leftEye.getWorldPosition(leftPos);
+
+        pos.copy(leftPos).add(rightPos).multiplyScalar(0.5);
+        camera.getWorldQuaternion(quat);
+
+        const offset = new THREE.Vector3(0, 0, 0);
+        //if (this.aiming) offset.set(0, 0, -0.03);
+
+        offset.applyQuaternion(quat);
+
+        this.nextLocalCameraTransform.copyPosition(pos.add(offset));
+        this.nextLocalCameraTransform.copyQuaternion(quat);
+
+        this.currentLocalCameraTransform.interpolateToTransform(this.nextLocalCameraTransform, 1.0);
+        this.currentLocalCameraTransform.copyQuaternion(quat);
+
+        camera.position.copy(this.currentLocalCameraTransform.position);
     }
 
 
@@ -124,8 +268,7 @@ export class Player extends Character {
         this.updateAnimator(dt, {x, y, inHand: this.inHand, aiming: this.aiming});
 
         this.correctBoneTransforms(x, y);
-
-        camera.position.copy(this.transform.position.clone().add(new THREE.Vector3(0, 2, -1)));
+        this.setCameraTransform();
     }
 
 

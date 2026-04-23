@@ -21,7 +21,7 @@ export class Transform {
         return this;
     }
 
-    setScale(x = 0, y = 0, z = 0) {
+    setScale(x = 1, y = 1, z = 1) {
         this.scale.set(x, y, z);
         return this;
     }
@@ -36,12 +36,30 @@ export class Transform {
         return this;
     }
 
-    copyScale(s = new THREE.Vector3(0, 0, 0)) {
+    copyScale(s = new THREE.Vector3(1, 1, 1)) {
         this.scale.copy(s);
         return this;
     }
 
     getEulerRotation() {
         return new THREE.Euler().setFromQuaternion(this.quaternion);
+    }
+
+    interpolateToTransform(transform = new Transform(), alpha = 0.1) {
+        this.position.lerp(transform.position, alpha);
+        this.quaternion.slerp(transform.quaternion, alpha);
+        this.scale.lerp(transform.scale, alpha);
+        this.velocity.lerp(transform.velocity, alpha);
+
+        return this;
+    }
+
+    interpolateAttribute(attr = "position", val = null, alpha = 0.1) {
+        if (!val) return;
+        switch (attr) {
+            case "position":
+                this.position.lerp(val, alpha);
+                break;
+        }
     }
 }

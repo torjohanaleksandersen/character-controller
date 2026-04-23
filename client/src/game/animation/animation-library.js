@@ -117,38 +117,27 @@ export class AnimationLibrary {
     await Promise.all([
       this.loadAnimation("idle", ["lower", "upper"]),
       this.loadAnimation("walk-forward", ["lower", "upper"]),
+      this.loadAnimation("walk-backward", ["lower", "upper"]),
       this.loadAnimation("walk-right", ["lower", "upper"], 1.103),
       this.loadAnimation("walk-left", ["lower", "upper"], 1.103),
 
       this.loadAnimation("idle-rifle-aiming", ["upper"]),
       this.loadAnimation("walk-rifle-aiming", ["upper"]),
+      this.loadAnimation("idle-rifle", ["upper"]),
     ]);
-
-    const walkForwardLower = this.clips.lower["walk-forward"];
-    const walkForwardUpper = this.clips.upper["walk-forward"];
-
-    if (walkForwardLower) {
-      this.clips.lower["walk-backward"] = reverseClip(walkForwardLower, "walk-backward");
-    }
-
-    if (walkForwardUpper) {
-      this.clips.upper["walk-backward"] = reverseClip(walkForwardUpper, "walk-backward");
-    }
-
-    this.timeScales["walk-backward"] = this.timeScales["walk-forward"] ?? 1.0;
 
     const walkRightLower = this.clips.lower["walk-right"];
     const walkRightUpper = this.clips.upper["walk-right"];
 
     if (walkRightLower) {
-      this.clips.lower["walk-left_reversed"] = reverseClip(walkRightLower, "walk-left_reversed");
+      this.clips.lower["walk-right_reversed"] = reverseClip(walkRightLower, "walk-right_reversed");
     }
 
     if (walkRightUpper) {
-      this.clips.upper["walk-left_reversed"] = reverseClip(walkRightUpper, "walk-left_reversed");
+      this.clips.upper["walk-right_reversed"] = reverseClip(walkRightUpper, "walk-right_reversed");
     }
 
-    this.timeScales["walk-left_reversed"] = this.timeScales["walk-right"] ?? 1.0;
+    this.timeScales["walk-right_reversed"] = this.timeScales["walk-right"] ?? 1.0;
   }
 
   getClip(layer, name) {
